@@ -3,7 +3,29 @@ Markdown preview and rendering.
 """
 
 import markdown
+from itertools import count
+from pathlib import Path
 from typing import Optional
+
+
+def save_preview(file_path: str) -> Path:
+    """Save a sibling HTML preview without overwriting any existing file."""
+    from .file_ops import open_file
+
+    source = Path(file_path)
+    html = render_to_html(open_file(file_path))
+
+    for number in count():
+        suffix = "" if number == 0 else f"_{number}"
+        output = source.with_name(f"{source.stem}_preview{suffix}.html")
+        try:
+            # Exclusive creation also protects existing symlinks and hard links.
+            stream = output.open("x", encoding="utf-8")
+        except FileExistsError:
+            continue
+        with stream:
+            stream.write(html)
+        return output
 
 
 def render_to_html(markdown_text: str, extensions: Optional[list] = None) -> str:

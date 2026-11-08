@@ -46,6 +46,12 @@ mdedit stats README.md
 mdedit preview README.md
 ```
 
+The preview is saved beside the source as `README_preview.html`. Only the
+filename's final extension is replaced, so `.markdown`, `.MD`, extensionless
+files, and directories containing `.md` are handled safely. The source is
+never overwritten. If the output name already exists, a numbered name such as
+`README_preview_1.html` is used instead; existing files and links are left alone.
+
 ### Export to HTML
 ```bash
 mdedit export README.md -o output.html --format html

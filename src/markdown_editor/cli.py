@@ -8,7 +8,7 @@ from rich.table import Table
 from rich.panel import Panel
 
 from .file_ops import create_new_file, open_file, save_file, get_file_stats
-from .preview import render_to_html, preview_to_terminal
+from .preview import save_preview
 from .stats import analyze_markdown
 from .search import search_in_file, replace_in_file
 from .exporter import export_to_html, export_to_pdf
@@ -80,19 +80,13 @@ def stats(filename):
 def preview(filename, browser):
     """Preview markdown as HTML."""
     try:
-        content = open_file(filename)
-        html = render_to_html(content)
-
-        # Save preview HTML
-        preview_file = filename.replace(".md", "_preview.html")
-        from pathlib import Path
-        Path(preview_file).write_text(html, encoding="utf-8")
+        preview_file = save_preview(filename)
 
         console.print(f"✅ Preview saved to: [bold green]{preview_file}[/bold green]")
         if browser:
             console.print("ℹ️ Open this file in your browser to view the preview")
-    except FileNotFoundError as e:
-        console.print(f"❌ {e}", err=True)
+    except (OSError, UnicodeError) as e:
+        raise click.ClickException(str(e)) from e
 
 
 @main.command()

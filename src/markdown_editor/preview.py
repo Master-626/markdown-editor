@@ -3,8 +3,10 @@ Markdown preview and rendering.
 """
 
 import markdown
+import os
 from itertools import count
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Optional
 
 
@@ -15,17 +17,41 @@ def save_preview(file_path: str) -> Path:
     source = Path(file_path)
     html = render_to_html(open_file(file_path))
 
-    for number in count():
-        suffix = "" if number == 0 else f"_{number}"
-        output = source.with_name(f"{source.stem}_preview{suffix}.html")
-        try:
-            # Exclusive creation also protects existing symlinks and hard links.
-            stream = output.open("x", encoding="utf-8")
-        except FileExistsError:
-            continue
-        with stream:
+    staging = None
+    try:
+        with NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=str(source.parent),
+            prefix=".mdedit-preview-", suffix=".tmp", delete=False,
+        ) as stream:
+            staging = Path(stream.name)
             stream.write(html)
-        return output
+
+        for number in count():
+            suffix = "" if number == 0 else f"_{number}"
+            output = source.with_name(f"{source.stem}_preview{suffix}.html")
+            try:
+                output.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                continue
+            try:
+                # Publishing a hard link cannot replace or follow a destination
+                # symlink, even on Windows where open("x") may follow one.
+                os.link(staging, output)
+            except FileExistsError:
+                continue
+            except PermissionError as error:
+                # Windows may report a raced directory collision as EACCES.
+                try:
+                    output.lstat()
+                except FileNotFoundError:
+                    raise error
+                continue
+            return output
+    finally:
+        if staging is not None:
+            staging.unlink()
 
 
 def render_to_html(markdown_text: str, extensions: Optional[list] = None) -> str:

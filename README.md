@@ -51,6 +51,9 @@ filename's final extension is replaced, so `.markdown`, `.MD`, extensionless
 files, and directories containing `.md` are handled safely. The source is
 never overwritten. If the output name already exists, a numbered name such as
 `README_preview_1.html` is used instead; existing files and links are left alone.
+Preview publication uses a hard link to avoid following existing output links
+on any platform. Filesystems without hard-link support report an error rather
+than risk overwriting or redirecting the output.
 
 ### Export to HTML
 ```bash

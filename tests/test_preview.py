@@ -1,6 +1,7 @@
 """Regression tests for preview path handling and source preservation."""
 
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from click.testing import CliRunner
 
 from markdown_editor.cli import main
 from markdown_editor.preview import save_preview
+import markdown_editor.preview as preview_module
 
 
 SOURCE = "# Keep this source\n\nPrivate draft: café 中文\n".encode("utf-8")
@@ -118,25 +120,43 @@ def test_existing_output_links_are_not_followed(tmp_path, kind):
         assert output.samefile(source)
 
 
-def test_exclusive_create_preserves_a_concurrent_output(tmp_path, monkeypatch):
+@pytest.mark.parametrize("kind", ["file", "dangling_symlink", "directory"])
+def test_atomic_publication_preserves_a_concurrent_output(tmp_path, monkeypatch, kind):
     source = tmp_path / "notes.md"
     source.write_bytes(SOURCE)
     output = tmp_path / "notes_preview.html"
-    original_open = Path.open
+    missing_target = tmp_path / "missing.md"
+    original_link = os.link
 
-    def create_competing_output(path, mode="r", *args, **kwargs):
-        if path == output and mode == "x":
-            with original_open(output, "wb") as stream:
-                stream.write(b"Another process created this file")
-        return original_open(path, mode, *args, **kwargs)
+    def create_competing_output(staging, destination):
+        if destination == output:
+            if kind == "file":
+                output.write_bytes(b"Another process created this file")
+            elif kind == "directory":
+                output.mkdir()
+                # Simulate the Windows error for a raced directory.
+                raise PermissionError("Directory already occupies this name")
+            else:
+                try:
+                    output.symlink_to(missing_target)
+                except (OSError, NotImplementedError) as error:
+                    pytest.skip(f"This platform cannot create the test link: {error}")
+        return original_link(staging, destination)
 
-    monkeypatch.setattr(Path, "open", create_competing_output)
+    monkeypatch.setattr(os, "link", create_competing_output)
     result = CliRunner().invoke(main, ["preview", str(source)])
 
     assert result.exit_code == 0, result.output
     assert source.read_bytes() == SOURCE
-    assert output.read_bytes() == b"Another process created this file"
+    if kind == "file":
+        assert output.read_bytes() == b"Another process created this file"
+    elif kind == "directory":
+        assert output.is_dir()
+    else:
+        assert output.is_symlink()
+        assert not missing_target.exists()
     assert (tmp_path / "notes_preview_1.html").is_file()
+    assert not list(tmp_path.glob(".mdedit-preview-*"))
 
 
 @pytest.mark.parametrize("kind", ["missing", "directory", "invalid_utf8"])
@@ -161,19 +181,93 @@ def test_invalid_input_exits_nonzero_without_creating_output(tmp_path, kind):
 def test_output_permission_error_exits_nonzero_without_touching_source(tmp_path, monkeypatch):
     source = tmp_path / "notes.md"
     source.write_bytes(SOURCE)
-    original_open = Path.open
+    def deny_output(staging, destination):
+        raise PermissionError("Cannot write preview")
 
-    def deny_output(path, mode="r", *args, **kwargs):
-        if mode == "x":
-            raise PermissionError("Cannot write preview")
-        return original_open(path, mode, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "open", deny_output)
+    monkeypatch.setattr(os, "link", deny_output)
     result = CliRunner().invoke(main, ["preview", str(source)])
 
     assert result.exit_code != 0
     assert "Cannot write preview" in result.output
     assert "Preview saved" not in result.output
+    assert source.read_bytes() == SOURCE
+    assert set(tmp_path.iterdir()) == {source}
+
+
+def test_unsupported_link_filesystem_fails_without_partial_output(tmp_path, monkeypatch):
+    source = tmp_path / "notes.md"
+    source.write_bytes(SOURCE)
+
+    def unsupported_link(staging, destination):
+        raise OSError("Hard links are not supported on this filesystem")
+
+    monkeypatch.setattr(os, "link", unsupported_link)
+    result = CliRunner().invoke(main, ["preview", str(source)])
+
+    assert result.exit_code != 0
+    assert "Hard links are not supported" in result.output
+    assert "Preview saved" not in result.output
+    assert source.read_bytes() == SOURCE
+    assert set(tmp_path.iterdir()) == {source}
+
+
+def test_preview_is_complete_before_publication(tmp_path, monkeypatch):
+    source = tmp_path / "notes.md"
+    source.write_bytes(SOURCE)
+    original_link = os.link
+
+    def inspect_staging(staging, destination):
+        assert staging.read_text(encoding="utf-8").endswith("</html>")
+        assert not destination.exists()
+        return original_link(staging, destination)
+
+    monkeypatch.setattr(os, "link", inspect_staging)
+
+    output = save_preview(str(source))
+
+    assert output.read_text(encoding="utf-8").endswith("</html>")
+    assert source.read_bytes() == SOURCE
+    assert not list(tmp_path.glob(".mdedit-preview-*"))
+
+
+def test_staging_write_failure_is_cleaned_up(tmp_path, monkeypatch):
+    source = tmp_path / "notes.md"
+    source.write_bytes(SOURCE)
+    original_temporary_file = preview_module.NamedTemporaryFile
+
+    @contextmanager
+    def failing_temporary_file(*args, **kwargs):
+        with original_temporary_file(*args, **kwargs) as stream:
+            class FailingStream:
+                name = stream.name
+
+                def write(self, text):
+                    stream.write(text[:10])
+                    raise OSError("Preview disk is full")
+
+            yield FailingStream()
+
+    monkeypatch.setattr(preview_module, "NamedTemporaryFile", failing_temporary_file)
+    result = CliRunner().invoke(main, ["preview", str(source)])
+
+    assert result.exit_code != 0
+    assert "Preview disk is full" in result.output
+    assert source.read_bytes() == SOURCE
+    assert set(tmp_path.iterdir()) == {source}
+
+
+def test_staging_creation_failure_preserves_source(tmp_path, monkeypatch):
+    source = tmp_path / "notes.md"
+    source.write_bytes(SOURCE)
+
+    def denied_temporary_file(*args, **kwargs):
+        raise PermissionError("Cannot create preview staging file")
+
+    monkeypatch.setattr(preview_module, "NamedTemporaryFile", denied_temporary_file)
+    result = CliRunner().invoke(main, ["preview", str(source)])
+
+    assert result.exit_code != 0
+    assert "Cannot create preview staging file" in result.output
     assert source.read_bytes() == SOURCE
     assert set(tmp_path.iterdir()) == {source}
 

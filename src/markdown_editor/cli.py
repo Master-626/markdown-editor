@@ -91,18 +91,18 @@ def preview(filename, browser):
 
 @main.command()
 @click.argument("filename")
-@click.option("-o", "--output", required=True, help="Output file path")
-@click.option("--format", "output_format", default="html", type=click.Choice(["html", "pdf"]), help="Output format")
+@click.option("-o", "--output", required=True, help="New output file path (existing files are never overwritten)")
+@click.option("--format", "output_format", default="html", type=click.Choice(["html", "pdf"]), help="Output format (PDF is not supported)")
 def export(filename, output, output_format):
-    """Export markdown to HTML or PDF."""
+    """Export markdown to a new HTML file. PDF is not supported."""
     try:
         if output_format == "html":
             path = export_to_html(filename, output)
         else:
             path = export_to_pdf(filename, output)
         console.print(f"✅ Exported to: [bold green]{path}[/bold green]")
-    except FileNotFoundError as e:
-        console.print(f"❌ {e}", err=True)
+    except (OSError, UnicodeError, NotImplementedError) as e:
+        raise click.ClickException(str(e)) from e
 
 
 @main.command()

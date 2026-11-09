@@ -60,6 +60,17 @@ than risk overwriting or redirecting the output.
 mdedit export README.md -o output.html --format html
 ```
 
+Export requires a new output path. Existing files, directories, and links are
+never overwritten, including the Markdown source itself. If `output.html`
+already exists, choose a different name. The complete HTML is staged beside
+the destination and published using a hard link; filesystems without hard-link
+support report an error rather than create a partial or unsafe output.
+
+PDF export is not supported yet. `--format pdf` exits with an error without
+creating or changing any files. To make a PDF, export HTML, open it in a browser,
+and choose **Print / Save as PDF**. The Python API's `export_to_pdf()` likewise
+raises `NotImplementedError`; it does not create a placeholder or HTML fallback.
+
 ### Search in File
 ```bash
 mdedit search README.md "installation"

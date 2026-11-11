@@ -2,12 +2,16 @@
 Markdown preview and rendering.
 """
 
-import markdown
 import os
 from itertools import count
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Optional
+
+import markdown
+from rich.markup import escape
+
+from .stats import extract_outline, fence_regions
 
 
 def save_preview(file_path: str) -> Path:
@@ -112,23 +116,33 @@ def render_to_html(markdown_text: str, extensions: Optional[list] = None) -> str
 
 
 def preview_to_terminal(markdown_text: str) -> str:
-    """Generate a simple terminal-friendly preview."""
+    """Generate a Rich-markup preview.
+
+    Heading text and other document text are escaped so characters such as
+    ``[draft]`` survive when the result is printed. Lines inside a closed
+    fenced code block are not styled as headings or lists.
+    """
     lines = markdown_text.splitlines()
+    headings = {item["line"]: item for item in extract_outline(markdown_text)}
+    delimiters, fenced = fence_regions(markdown_text)
     result = []
 
-    for line in lines:
-        # Simple markdown rendering for terminal
-        if line.startswith("# "):
-            result.append(f"\n[bold]{line[2:]}[/bold]")
-        elif line.startswith("## "):
-            result.append(f"\n[cyan]{line[3:]}[/cyan]")
-        elif line.startswith("### "):
-            result.append(f"\n[green]{line[4:]}[/green]")
+    for number, line in enumerate(lines, 1):
+        if number in delimiters:
+            result.append(f"[dim]{escape(line)}[/dim]")
+        elif number in fenced:
+            result.append(escape(line))
+        elif number in headings and headings[number]["level"] <= 3:
+            result.append(_format_heading(headings[number]))
         elif line.startswith("- "):
-            result.append(f"  • {line[2:]}")
-        elif line.startswith("```"):
-            result.append("[dim]" + line + "[/dim]")
+            result.append(f"  • {escape(line[2:])}")
         else:
-            result.append(line)
+            result.append(escape(line))
 
     return "\n".join(result)
+
+
+def _format_heading(item: dict) -> str:
+    styles = {1: "bold", 2: "cyan", 3: "green"}
+    style = styles[item["level"]]
+    return f"\n[{style}]{escape(item['text'])}[/{style}]"

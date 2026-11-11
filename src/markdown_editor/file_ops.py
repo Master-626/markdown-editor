@@ -2,18 +2,34 @@
 File handling operations for markdown-editor.
 """
 
+import os
 from pathlib import Path
-from typing import Optional
 
 
 def create_new_file(file_path: str, template: str = "") -> Path:
-    """Create a new markdown file."""
-    path = Path(file_path)
-    if path.exists():
-        raise FileExistsError(f"File already exists: {file_path}")
+    """Create a new markdown file.
 
-    content = template or "# New Document\n\nStart writing here...\n"
-    path.write_text(content, encoding="utf-8")
+    Existing files, directories, and symlinks are left untouched. A dangling
+    symlink is not followed, so its target is not created. An empty
+    ``template`` selects the built-in starter text.
+    """
+    path = Path(file_path)
+    content = template if template else "# New Document\n\nStart writing here...\n"
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    except OSError as error:
+        if path.is_symlink() or path.exists():
+            raise FileExistsError(f"File already exists: {file_path}") from error
+        raise
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(content)
+    except Exception:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        raise
     return path
 
 
@@ -26,9 +42,10 @@ def open_file(file_path: str) -> str:
 
 
 def save_file(file_path: str, content: str) -> Path:
-    """Save content to a markdown file."""
+    """Save content to a markdown file without changing its newline characters."""
     path = Path(file_path)
-    path.write_text(content, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(content)
     return path
 
 

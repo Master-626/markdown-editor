@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "markdown-editor"
 version = "0.1.0"
-description = "A full-featured terminal Markdown editor CLI with preview, export, and statistics"
+description = "Terminal Markdown toolkit for preview, HTML export, search, and writing statistics"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
@@ -23,6 +23,8 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Text Editors",
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
@@ -40,7 +42,20 @@ markdown-editor = "markdown_editor.cli:main"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "ruff>=0.4.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
 
 [project.urls]
 Homepage = "https://github.com/Master-626/markdown-editor"

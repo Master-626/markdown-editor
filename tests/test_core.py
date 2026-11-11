@@ -1,9 +1,7 @@
-import pytest
-from pathlib import Path
 from markdown_editor.file_ops import create_new_file, open_file, save_file
-from markdown_editor.stats import analyze_markdown
-from markdown_editor.search import search_in_file, replace_in_file
 from markdown_editor.preview import render_to_html
+from markdown_editor.search import replace_in_file, search_in_file
+from markdown_editor.stats import analyze_markdown
 
 
 def test_create_new_file(tmp_path):

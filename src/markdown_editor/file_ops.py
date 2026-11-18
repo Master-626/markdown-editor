@@ -15,6 +15,14 @@ def create_new_file(file_path: str, template: str = "") -> Path:
     """
     path = Path(file_path)
     content = template if template else "# New Document\n\nStart writing here...\n"
+    # Refuse any existing directory entry before opening. On Windows, os.open
+    # follows a dangling symlink even with O_EXCL and would create the target.
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        raise FileExistsError(f"File already exists: {file_path}")
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
     except OSError as error:

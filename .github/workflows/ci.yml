@@ -25,11 +25,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # ubuntu-latest is Ubuntu 26.04. setup-python cannot install 3.8 or 3.9
+        # there; those jobs stay on Ubuntu 22.04. 3.8 succeeded on 22.04.
         os: [ubuntu-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         include:
           - os: ubuntu-22.04
             python-version: "3.8"
+          - os: ubuntu-22.04
+            python-version: "3.9"
           - os: macos-latest
             python-version: "3.13"
           - os: windows-latest

@@ -172,7 +172,7 @@ pytest
 ruff check .
 ```
 
-GitHub Actions runs Ruff, then pytest on Python 3.8 through 3.13. The 3.8 job uses Ubuntu 22.04; 3.13 is also run on macOS and Windows. The workflow installs the package, checks dependencies, builds a wheel, and runs `mdedit --help`.
+GitHub Actions runs Ruff, then pytest on Python 3.8 through 3.13. Python 3.8 and 3.9 run on Ubuntu 22.04, because `ubuntu-latest` is Ubuntu 26.04 and setup-python cannot install those versions there. Python 3.10 and newer run on `ubuntu-latest`. Python 3.13 is also run on macOS and Windows. The workflow installs the package, checks dependencies, builds a wheel, and runs `mdedit --help`.
 
 ## License
 

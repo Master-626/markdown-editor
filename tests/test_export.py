@@ -7,10 +7,9 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+import markdown_editor.exporter as exporter_module
 from markdown_editor.cli import main
 from markdown_editor.exporter import export_to_html, export_to_pdf
-import markdown_editor.exporter as exporter_module
-
 
 SOURCE = "# Keep this source\n\nPrivate draft: café 中文\n".encode("utf-8")
 
@@ -55,7 +54,10 @@ def test_html_export_cli_accepts_relative_paths(tmp_path, monkeypatch):
     assert Path("notes.markdown").read_bytes() == SOURCE
 
 
-@pytest.mark.parametrize("kind", ["source", "file", "directory", "symlink", "hardlink", "dangling_symlink"])
+@pytest.mark.parametrize(
+    "kind",
+    ["source", "file", "directory", "symlink", "hardlink", "dangling_symlink"],
+)
 def test_html_export_refuses_existing_output_without_changing_it(tmp_path, kind):
     source = tmp_path / "notes.md"
     source.write_bytes(SOURCE)
@@ -192,7 +194,10 @@ def test_output_parent_is_file_reports_clean_error(tmp_path):
     assert set(tmp_path.iterdir()) == {source, output_parent}
 
 
-@pytest.mark.parametrize("error", [PermissionError("Cannot write export"), OSError("Hard links are not supported")])
+@pytest.mark.parametrize(
+    "error",
+    [PermissionError("Cannot write export"), OSError("Hard links are not supported")],
+)
 def test_publication_failure_leaves_no_partial_output(tmp_path, monkeypatch, error):
     source = tmp_path / "notes.md"
     source.write_bytes(SOURCE)
@@ -297,7 +302,10 @@ def test_post_publication_cleanup_failure_reports_created_output(tmp_path, monke
     assert staging_files[0].samefile(output)
 
 
-@pytest.mark.parametrize("filename", ["out.pdf", "out.PDF", "out", "directory.pdf/out.pdf", "new/nested/out.pdf", "notes.md"])
+@pytest.mark.parametrize(
+    "filename",
+    ["out.pdf", "out.PDF", "out", "directory.pdf/out.pdf", "new/nested/out.pdf", "notes.md"],
+)
 def test_pdf_cli_refuses_format_without_writing_anything(tmp_path, filename):
     source = tmp_path / "notes.md"
     source.write_bytes(SOURCE)

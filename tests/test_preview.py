@@ -7,10 +7,9 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+import markdown_editor.preview as preview_module
 from markdown_editor.cli import main
 from markdown_editor.preview import save_preview
-import markdown_editor.preview as preview_module
-
 
 SOURCE = "# Keep this source\n\nPrivate draft: café 中文\n".encode("utf-8")
 
